@@ -21,6 +21,7 @@ enum class Command : uint32_t {
   kConnect,
   kMove,
   kStopMove,
+  kGetCartesianLimit,
   kSetCollisionBehavior,
   kSetJointImpedance,
   kSetCartesianImpedance,
@@ -28,6 +29,7 @@ enum class Command : uint32_t {
   kSetEEToK,
   kSetNEToEE,
   kSetLoad,
+  kSetFilters,
   kAutomaticErrorRecovery,
   kLoadModelLibrary
 };
@@ -145,15 +147,15 @@ struct Move : public CommandBase<Move, Command::kMove> {
     kSuccess,
     kMotionStarted,
     kPreempted,
-    kPreemptedDueToActivatedSafetyFunctions,
-    kCommandRejectedDueToActivatedSafetyFunctions,
     kCommandNotPossibleRejected,
     kStartAtSingularPoseRejected,
     kInvalidArgumentRejected,
     kReflexAborted,
     kEmergencyAborted,
     kInputErrorAborted,
-    kAborted
+    kAborted,
+    kPreemptedDueToActivatedSafetyFunctions,
+    kCommandRejectedDueToActivatedSafetyFunctions
   };
 
   struct Deviation {
@@ -185,10 +187,10 @@ struct StopMove : public CommandBase<StopMove, Command::kStopMove> {
   enum class Status : uint8_t {
     kSuccess,
     kCommandNotPossibleRejected,
-    kCommandRejectedDueToActivatedSafetyFunctions,
     kEmergencyAborted,
     kReflexAborted,
-    kAborted
+    kAborted,
+    kCommandRejectedDueToActivatedSafetyFunctions,
   };
 };
 
@@ -288,11 +290,11 @@ struct AutomaticErrorRecovery
   enum class Status : uint8_t {
     kSuccess,
     kCommandNotPossibleRejected,
-    kCommandRejectedDueToActivatedSafetyFunctions,
     kManualErrorRecoveryRequiredRejected,
     kReflexAborted,
     kEmergencyAborted,
-    kAborted
+    kAborted,
+    kCommandRejectedDueToActivatedSafetyFunctions
   };
 };
 
