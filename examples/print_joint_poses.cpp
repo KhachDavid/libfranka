@@ -29,12 +29,14 @@ int main(int argc, char** argv) {
 
   try {
     franka::Robot robot(argv[1]);
-
+    std::cout << "Pre-read" << std::endl;
     franka::RobotState state = robot.readOnce();
-
+    std::cout << "Post-read" << std::endl;
     franka::Model model(robot.loadModel());
+    std::cout << "POst-model" << std::endl;
     for (franka::Frame frame = franka::Frame::kJoint1; frame <= franka::Frame::kEndEffector;
          frame++) {
+        std::cout << "OOOO" << std::endl;
       std::cout << model.pose(frame, state) << std::endl;
     }
   } catch (franka::Exception const& e) {
