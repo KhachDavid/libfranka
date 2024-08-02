@@ -3,8 +3,6 @@
 #include "library_downloader.h"
 
 #include <exception>
-#warning remove <iostream> when debugging is done
-#include <iostream>
 #include <fstream>
 #include <vector>
 
@@ -42,13 +40,10 @@ LibraryDownloader::LibraryDownloader(Network& network)
 #else
   throw ModelException("libfranka: Unsupported operating system!");
 #endif
-  std::cout << __FILE__ <<":" << __LINE__ << " pre req" << std::endl;
   uint32_t command_id = network.tcpSendRequest<LoadModelLibrary>(architecture, operating_system);
-  std::cout << __FILE__ <<":" << __LINE__ << " post req" << std::endl;
   std::vector<uint8_t> buffer;
   LoadModelLibrary::Response response =
       network.tcpBlockingReceiveResponse<LoadModelLibrary>(command_id, &buffer);
-  std::cout << __FILE__ <<":" << __LINE__ << " post resp" << std::endl;
   if (response.status != LoadModelLibrary::Status::kSuccess) {
     throw ModelException("libfranka: Server reports error when loading model library.");
   }
