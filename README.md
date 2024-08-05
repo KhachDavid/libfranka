@@ -1,5 +1,11 @@
 # libfranka: C++ library for Franka Robotics research robots
 
+# Northwestern MSR Changes
+1. This library is now meant to be used with the Franka Emika Panda Robot, that is officially only compatible with v0.9.0 of libfranka
+   - It is modified from v0.13.3 of libfranka to be compatible with the Panda
+   - Velocity, joint, and rate limits are set to be that of the Panda
+2. The Panda and FR3 robots are very similar but have slightly different capabilities: use at your own risk!
+
 [![Build Status][travis-status]][travis]
 [![codecov][codecov-status]][codecov]
 
