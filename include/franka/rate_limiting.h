@@ -31,8 +31,9 @@ constexpr double kNormEps = std::numeric_limits<double>::epsilon();
  * When a packet is lost, FCI assumes a constant acceleration model.
  * For FR3 there are no expected package loses. Therefore this number is set to 0. If you
  * encounter package loses with your setup you can increase this number
+ * For the Panda, this number has been restored to the default number for Panda
  */
-constexpr double kTolNumberPacketsLost = 0.0;
+constexpr double kTolNumberPacketsLost = 3.0;
 /**
  * Factor for the definition of rotational limits using the Cartesian Pose interface
  */
@@ -47,14 +48,14 @@ constexpr std::array<double, 7> kMaxTorqueRate{
  * Maximum joint jerk
  */
 constexpr std::array<double, 7> kMaxJointJerk{
-    {5000.0 - kLimitEps, 5000.0 - kLimitEps, 5000.0 - kLimitEps, 5000.0 - kLimitEps,
-     5000.0 - kLimitEps, 5000.0 - kLimitEps, 5000.0 - kLimitEps}};
+    {7500.0 - kLimitEps, 3750.0 - kLimitEps, 5000.0 - kLimitEps, 6250.0 - kLimitEps,
+     7500.0 - kLimitEps, 10000.0 - kLimitEps, 10000.0 - kLimitEps}};
 /**
  * Maximum joint acceleration
  */
 constexpr std::array<double, 7> kMaxJointAcceleration{
-    {10.0000 - kLimitEps, 10.0000 - kLimitEps, 10.0000 - kLimitEps, 10.0000 - kLimitEps,
-     10.0000 - kLimitEps, 10.0000 - kLimitEps, 10.0000 - kLimitEps}};
+    {15.0000 - kLimitEps, 7.500 - kLimitEps, 10.0000 - kLimitEps, 12.5000 - kLimitEps,
+     15.0000 - kLimitEps, 20.0000 - kLimitEps, 20.0000 - kLimitEps}};
 /**
  * Tolerance value for joint velocity limits to deal with numerical errors and data losses.
  */
@@ -70,24 +71,24 @@ constexpr std::array<double, 7> kJointVelocityLimitsTolerance{
 /**
  * Maximum translational jerk
  */
-constexpr double kMaxTranslationalJerk = 4500.0 - kLimitEps;
+constexpr double kMaxTranslationalJerk = 6500.0 - kLimitEps;
 /**
  * Maximum translational acceleration
  */
-constexpr double kMaxTranslationalAcceleration = 9.0000 - kLimitEps;
+constexpr double kMaxTranslationalAcceleration = 13.0000 - kLimitEps;
 /**
  * Maximum translational velocity
  */
 constexpr double kMaxTranslationalVelocity =
-    3.0000 - kLimitEps - kTolNumberPacketsLost * kDeltaT * kMaxTranslationalAcceleration;
+    2.0000 - kLimitEps - kTolNumberPacketsLost * kDeltaT * kMaxTranslationalAcceleration;
 /**
  * Maximum rotational jerk
  */
-constexpr double kMaxRotationalJerk = 8500.0 - kLimitEps;
+constexpr double kMaxRotationalJerk = 12500.0 - kLimitEps;
 /**
  * Maximum rotational acceleration
  */
-constexpr double kMaxRotationalAcceleration = 17.0000 - kLimitEps;
+constexpr double kMaxRotationalAcceleration = 25.0000 - kLimitEps;
 /**
  * Maximum rotational velocity
  */
@@ -105,35 +106,28 @@ constexpr double kMaxElbowAcceleration = 10.0000 - kLimitEps;
  * Maximum elbow velocity
  */
 constexpr double kMaxElbowVelocity =
-    1.5000 - kLimitEps - kTolNumberPacketsLost * kDeltaT * kMaxElbowAcceleration;
-
+    2.1750 - kLimitEps - kTolNumberPacketsLost * kDeltaT * kMaxElbowAcceleration;
 /**
  * Computes the maximum joint velocity based on joint position
  *
  * @note The implementation is based on
  * https://frankaemika.github.io/docs/control_parameters.html#limits-for-franka-research-3.
  *
+ * The Panda does not have position-dependent velocity limits, therefore we set these to
+ * The values used for the panda
  * @param[in] q joint position.
  *
  * @return Upper limits of joint velocity at the given joint position.
  */
-inline std::array<double, 7> computeUpperLimitsJointVelocity(const std::array<double, 7>& q) {
-  return std::array<double, 7>{
-      std::min(2.62, std::max(0.0, -0.30 + std::sqrt(std::max(0.0, 12.0 * (2.75010 - q[0]))))) -
-          kJointVelocityLimitsTolerance[0],
-      std::min(2.62, std::max(0.0, -0.20 + std::sqrt(std::max(0.0, 5.17 * (1.79180 - q[1]))))) -
-          kJointVelocityLimitsTolerance[1],
-      std::min(2.62, std::max(0.0, -0.20 + std::sqrt(std::max(0.0, 7.00 * (2.90650 - q[2]))))) -
-          kJointVelocityLimitsTolerance[2],
-      std::min(2.62, std::max(0.0, -0.30 + std::sqrt(std::max(0.0, 8.00 * (-0.1458 - q[3]))))) -
-          kJointVelocityLimitsTolerance[3],
-      std::min(5.26, std::max(0.0, -0.35 + std::sqrt(std::max(0.0, 34.0 * (2.81010 - q[4]))))) -
-          kJointVelocityLimitsTolerance[4],
-      std::min(4.18, std::max(0.0, -0.35 + std::sqrt(std::max(0.0, 11.0 * (4.52050 - q[5]))))) -
-          kJointVelocityLimitsTolerance[5],
-      std::min(5.26, std::max(0.0, -0.35 + std::sqrt(std::max(0.0, 34.0 * (3.01960 - q[6]))))) -
-          kJointVelocityLimitsTolerance[6],
-  };
+inline std::array<double, 7> computeUpperLimitsJointVelocity(const std::array<double, 7>& ) {
+    return std::array<double, 7>{
+        2.1750 - kJointVelocityLimitsTolerance[0],
+        2.1750 - kJointVelocityLimitsTolerance[1],
+        2.1750 - kJointVelocityLimitsTolerance[2],
+        2.1750 - kJointVelocityLimitsTolerance[3],
+        2.6100 - kJointVelocityLimitsTolerance[4],
+        2.6100 - kJointVelocityLimitsTolerance[5],
+        2.6100 - kJointVelocityLimitsTolerance[6]};
 }
 
 /**
@@ -144,25 +138,20 @@ inline std::array<double, 7> computeUpperLimitsJointVelocity(const std::array<do
  *
  * @param[in] q joint position.
  *
+ * The Panda does not have position-dependent velocity limits, therefore we set these to
+ * The values used for the panda
+ *
  * @return Lower limits of joint velocity at the given joint position.
  */
-inline std::array<double, 7> computeLowerLimitsJointVelocity(const std::array<double, 7>& q) {
-  return std::array<double, 7>{
-      std::max(-2.62, std::min(0.0, 0.30 - std::sqrt(std::max(0.0, 12.0 * (2.750100 + q[0]))))) +
-          kJointVelocityLimitsTolerance[0],
-      std::max(-2.62, std::min(0.0, 0.20 - std::sqrt(std::max(0.0, 5.17 * (1.791800 + q[1]))))) +
-          kJointVelocityLimitsTolerance[1],
-      std::max(-2.62, std::min(0.0, 0.20 - std::sqrt(std::max(0.0, 7.00 * (2.906500 + q[2]))))) +
-          kJointVelocityLimitsTolerance[2],
-      std::max(-2.62, std::min(0.0, 0.30 - std::sqrt(std::max(0.0, 8.00 * (3.048100 + q[3]))))) +
-          kJointVelocityLimitsTolerance[3],
-      std::max(-5.26, std::min(0.0, 0.35 - std::sqrt(std::max(0.0, 34.0 * (2.810100 + q[4]))))) +
-          kJointVelocityLimitsTolerance[4],
-      std::max(-4.18, std::min(0.0, 0.35 - std::sqrt(std::max(0.0, 11.0 * (-0.54092 + q[5]))))) +
-          kJointVelocityLimitsTolerance[5],
-      std::max(-5.26, std::min(0.0, 0.35 - std::sqrt(std::max(0.0, 34.0 * (3.019600 + q[6]))))) +
-          kJointVelocityLimitsTolerance[6],
-  };
+inline std::array<double, 7> computeLowerLimitsJointVelocity(const std::array<double, 7>& ) {
+    return std::array<double, 7>{
+         -(2.1750 - kJointVelocityLimitsTolerance[0]),
+         -(2.1750 - kJointVelocityLimitsTolerance[1]),
+         -(2.1750 - kJointVelocityLimitsTolerance[2]),
+         -(2.1750 - kJointVelocityLimitsTolerance[3]),
+         -(2.6100 - kJointVelocityLimitsTolerance[4]),
+         -(2.6100 - kJointVelocityLimitsTolerance[5]),
+         -(2.6100 - kJointVelocityLimitsTolerance[6])};
 }
 
 /**
