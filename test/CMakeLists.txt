@@ -9,7 +9,7 @@ set(TEST_DEPENDENCIES
   GTest::gmock_main
   Poco::Foundation
   Poco::Net
-  Eigen3::Eigen3
+  Eigen3::Eigen
   Threads::Threads
   franka
   libfranka-common

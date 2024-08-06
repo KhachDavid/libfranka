@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.4)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+cmake_minimum_required(VERSION 3.18)
 
 set(libfranka_VERSION 0.13.3)
 
@@ -8,8 +6,6 @@ project(libfranka
   VERSION ${libfranka_VERSION}
   LANGUAGES CXX
 )
-
-list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,9 +16,6 @@ if(MSVC)
 else()
   add_compile_options(-Wall -Wextra)
 endif()
-
-set(THIRDPARTY_SOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty" CACHE PATH
-  "Directory for third-party sources")
 
 ## Dependencies
 find_package(Poco REQUIRED COMPONENTS Net Foundation)
@@ -113,7 +106,7 @@ target_include_directories(franka PUBLIC
 target_link_libraries(franka PRIVATE
   Poco::Foundation
   Poco::Net
-  Eigen3::Eigen3
+  Eigen3::Eigen
   Threads::Threads
 )
 
@@ -213,7 +206,7 @@ file(GLOB_RECURSE TIDY_IGNORED_FILES
   src/libfcimodels.h
 )
 
-find_program(CLANG_FORMAT_PROG clang-format-6.0 DOC "'clang-format' executable")
+find_program(CLANG_FORMAT_PROG clang-format DOC "'clang-format' executable")
 if(CLANG_FORMAT_PROG)
   add_custom_target(format
     COMMAND ${CLANG_FORMAT_PROG} -i ${SOURCES} ${HEADERS} ${TEST_FILES}
@@ -231,7 +224,7 @@ else(CLANG_FORMAT_PROG)
   MESSAGE(WARNING "Could not find clang-format-6.0")
 endif()
 
-find_program(CLANG_TIDY_PROG clang-tidy-6.0 DOC "'clang-tidy' executable")
+find_program(CLANG_TIDY_PROG clang-tidy DOC "'clang-tidy' executable")
 if(CLANG_TIDY_PROG)
   # Build JSON string for clang-tidy's line filter
   set(TIDY_FILES ${SOURCES} ${HEADERS})
