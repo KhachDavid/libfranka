@@ -1,21 +1,12 @@
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 ## Google Test
-set(GTEST_SOURCE_DIR ${THIRDPARTY_SOURCES_DIR}/googletest)
-set(GTEST_BINARY_DIR ${CMAKE_BINARY_DIR}/googletest)
-set(GTEST_VERSION 1.8.0)
-set(GTEST_ARCHIVE_HASH 58a6f4277ca2bc8565222b3bbd58a177609e9c488e8a72649359ba51450db7d8)
-set(GTEST_LIBRARIES gtest gmock gmock_main)
-
-include(SetupGoogleTest)
-
-foreach(lib ${GTEST_LIBRARIES})
-  target_compile_options(${lib} PUBLIC -Wno-deprecated-copy)
-endforeach()
+find_package(GTest)
 
 set(TEST_OUTPUT_DIR ${PROJECT_BINARY_DIR}/test_results)
 set(TEST_DEPENDENCIES
-  ${GTEST_LIBRARIES}
+  GTest::gtest
+  GTest::gmock_main
   Poco::Foundation
   Poco::Net
   Eigen3::Eigen3
