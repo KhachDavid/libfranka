@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>libfranka</name>
+  <version>0.13.13</version>
+  <description>Fork of 0.13.3 of libfranka used for panda robots</description>
+  <maintainer email="support@franka.de">Franka Robotics GmbH</maintainer>
+  <license>Apache 2.0</license>
+
+  <buildtool_depend>cmake</buildtool_depend>
+
+  <depend>libpoco-dev</depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>
