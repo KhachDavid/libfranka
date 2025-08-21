@@ -47,6 +47,7 @@ set(EXAMPLES
   motion_with_control_external_control_loop
   print_joint_poses
   vacuum_object
+  grasp_two_inch_after_move
 )
 
 foreach(example ${EXAMPLES})
