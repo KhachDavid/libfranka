@@ -45,6 +45,7 @@ set(EXAMPLES
   joint_point_to_point_motion
   motion_with_control
   motion_with_control_external_control_loop
+  pick_and_place
   print_joint_poses
   vacuum_object
   grasp_two_inch_after_move
