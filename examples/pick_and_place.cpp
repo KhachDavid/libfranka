@@ -28,6 +28,9 @@ constexpr std::array<double, 7> kQHomeRad = {
 // Converted to degrees: [10.4, 16.7, 6.8, -147.3, -10.4, 168.6, 70.0]
 constexpr double kQPlaceDeg[7] = {10.4, 16.7, 6.8, -147.3, -10.4, 168.6, 70.0};
 
+// Assume a 4-inch maximum gripper opening for this example regardless of reported caps.
+constexpr double kAssumedMaxGripperWidth = 0.1016;  // 4 inches in meters
+
 std::array<double, 7> toRadians(const double q_deg[7]) {
   std::array<double, 7> q_rad{};
   for (size_t i = 0; i < 7; ++i) {
@@ -47,6 +50,7 @@ int main(int argc, char** argv) {
 
   try {
     const char* host = argc > 1 ? argv[1] : "127.0.0.1";  // FCI sim server
+    const bool is_sim = (std::string(host) == std::string("127.0.0.1"));
     double speed_factor = 0.2;        // safe default
     if (argc == 3) {
       speed_factor = std::stod(argv[2]);
@@ -65,12 +69,6 @@ int main(int argc, char** argv) {
 
     // Set collision behavior with relaxed thresholds to prevent cartesian reflex aborts
     // These values are more permissive than the default strict thresholds
-    robot.setCollisionBehavior(
-        {{50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0}},  // lower torque thresholds (joint contact)
-        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},  // upper torque thresholds (joint collision)
-        {{50.0, 50.0, 50.0, 50.0, 50.0, 50.0}},  // lower force thresholds (cartesian contact)
-        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}}   // upper force thresholds (cartesian collision)
-    );
 
     // Homing + open fully (near max width)
     std::cout << "=== Starting Pick and Place Operation ===" << std::endl;
@@ -78,8 +76,9 @@ int main(int argc, char** argv) {
     gripper.homing();
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     franka::GripperState gs = gripper.readOnce();
-    double open_width = std::max(0.0, gs.max_width - 0.001);
-    std::cout << "Gripper max_width: " << gs.max_width << ", opening to: " << open_width << std::endl;
+    double open_width = std::max(0.0, kAssumedMaxGripperWidth - 0.001);
+    std::cout << "Assuming gripper max_width: " << kAssumedMaxGripperWidth
+              << ", opening to: " << open_width << std::endl;
     gripper.move(open_width, 0.1);
 
     // Move to home pose if not already there.
@@ -151,27 +150,15 @@ int main(int argc, char** argv) {
     }
 
     // Grasp the object
-    constexpr double kObjectWidthMeters = 0.0408;  // 2 inches
+    constexpr double kObjectWidthMeters = 0.0508;  // 2 inches
     gs = gripper.readOnce();
-    double commanded_width = kObjectWidthMeters;
-    if (gs.max_width <= 0.0) {
-      std::cout << "Warning: gripper reports non-positive max width (" << gs.max_width
-                << "). Attempting to grasp anyway with requested width." << std::endl;
-    } else if (gs.max_width < kObjectWidthMeters) {
-      commanded_width = std::max(0.0, gs.max_width - 0.001);
-      std::cout << "Requested width (" << kObjectWidthMeters
-                << ") exceeds gripper max width (" << gs.max_width
-                << "). Clamping to " << commanded_width << "." << std::endl;
-    }
-    std::cout << "Closing gripper to width " << commanded_width << " m to grasp object..."
-              << std::endl;
-    bool grasp_success = gripper.grasp(commanded_width, /*speed=*/0.1, /*force=*/60.0);
-    if (!grasp_success) {
-      std::cout << "Grasp command reported failure." << std::endl;
-      // In sim, try move() as a fallback to set width.
-      gripper.move(commanded_width, 0.05);
-    }
-
+    double commanded_width = std::min(kObjectWidthMeters, kAssumedMaxGripperWidth - 0.001);
+    std::cout << "Closing gripper to width " << commanded_width << " m to grasp object..." << std::endl;
+    // Use a strong grasp attempt first; if it fails, fall back to move() tighter.
+    // move the gripper to assumed width - object width
+    bool grasp_ok = gripper.grasp(0.0508, /*speed=*/0.035, /*force=*/100.0,
+        /*epsilon_inner=*/0.002, /*epsilon_outer=*/0.003);
+    
     // Wait briefly and verify grasp
     std::this_thread::sleep_for(std::chrono::milliseconds(800));
     gs = gripper.readOnce();
@@ -180,14 +167,36 @@ int main(int argc, char** argv) {
 
     // PHASE 2: RETURN TO HOME WITH OBJECT
     std::cout << "\n=== PHASE 2: RETURN TO HOME WITH OBJECT ===" << std::endl;
-    
-    // Update collision behavior for return home with object
-    robot.setCollisionBehavior(
-        {{50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0}},  // lower torque thresholds
-        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},  // upper torque thresholds
-        {{50.0, 50.0, 50.0, 50.0, 50.0, 50.0}},  // lower force thresholds
-        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}}   // upper force thresholds
-    );
+
+    // Joint-space retreat to increase clearance before lateral motion,
+    // then progress toward home via two gentle intermediate waypoints.
+    {
+      franka::RobotState s = robot.readOnce();
+      // 1) Stronger lift by nudging elbow/shoulder toward zero
+      std::array<double, 7> q_lift = s.q;
+      auto towards_zero = [](double q, double delta){ return (q > 0.0) ? std::max(0.0, q - delta)
+                                                                      : std::min(0.0, q + delta); };
+      q_lift[3] = towards_zero(q_lift[3], 0.50);  // elbow up more
+      q_lift[1] = towards_zero(q_lift[1], 0.25);  // shoulder up more
+      MotionGenerator lift_gen(std::min(0.10, speed_factor), q_lift);
+      robot.control(lift_gen);
+      std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+      // 2) Refresh state and blend two steps toward home to pull away safely
+      s = robot.readOnce();
+      std::array<double, 7> q_step1{};
+      for (size_t i = 0; i < 7; ++i) q_step1[i] = s.q[i] + 0.35 * (kQHomeRad[i] - s.q[i]);
+      MotionGenerator step_gen1(std::min(0.10, speed_factor), q_step1);
+      robot.control(step_gen1);
+      std::this_thread::sleep_for(std::chrono::milliseconds(120));
+
+      s = robot.readOnce();
+      std::array<double, 7> q_step2{};
+      for (size_t i = 0; i < 7; ++i) q_step2[i] = s.q[i] + 0.65 * (kQHomeRad[i] - s.q[i]);
+      MotionGenerator step_gen2(std::min(0.12, speed_factor), q_step2);
+      robot.control(step_gen2);
+      std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    }
     
     std::cout << "Moving back to home position with grasped object..." << std::endl;
     MotionGenerator home_with_object_generator(speed_factor, kQHomeRad);
@@ -195,14 +204,6 @@ int main(int argc, char** argv) {
 
     // PHASE 3: PLACE OPERATION
     std::cout << "\n=== PHASE 3: PLACE OPERATION ===" << std::endl;
-    
-    // Update collision behavior for place operation
-    robot.setCollisionBehavior(
-        {{50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0}},  // lower torque thresholds
-        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},  // upper torque thresholds
-        {{50.0, 50.0, 50.0, 50.0, 50.0, 50.0}},  // lower force thresholds
-        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}}   // upper force thresholds
-    );
     
     // Move to place location
     const std::array<double, 7> q_place = toRadians(kQPlaceDeg);
@@ -234,18 +235,34 @@ int main(int argc, char** argv) {
     std::cout << "Gripper width after release: " << gs.width
               << ", is_grasped: " << (gs.is_grasped ? "true" : "false") << std::endl;
 
+    // Joint-space retreat after placing to clear the surface.
+    {
+      franka::RobotState s = robot.readOnce();
+      std::array<double, 7> q_lift = s.q;
+      auto towards_zero = [](double q, double delta){ return (q > 0.0) ? std::max(0.0, q - delta)
+                                                                      : std::min(0.0, q + delta); };
+      q_lift[3] = towards_zero(q_lift[3], 0.30);
+      q_lift[1] = towards_zero(q_lift[1], 0.15);
+      MotionGenerator lift_gen(std::min(0.15, speed_factor), q_lift);
+      robot.control(lift_gen);
+      std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    }
+
     // PHASE 4: RETURN TO HOME
     std::cout << "\n=== PHASE 4: RETURN TO HOME ===" << std::endl;
     
-    // Update collision behavior for final return home
-    robot.setCollisionBehavior(
-        {{50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0}},  // lower torque thresholds
-        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},  // upper torque thresholds
-        {{50.0, 50.0, 50.0, 50.0, 50.0, 50.0}},  // lower force thresholds
-        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}}   // upper force thresholds
-    );
-    
     std::cout << "Moving back to home position..." << std::endl;
+    // Use a gentle intermediate waypoint to avoid awkward plans from the place posture.
+    {
+      franka::RobotState s = robot.readOnce();
+      std::array<double, 7> q_mid{};
+      for (size_t i = 0; i < 7; ++i) {
+        q_mid[i] = 0.5 * s.q[i] + 0.5 * kQHomeRad[i];
+      }
+      MotionGenerator mid_generator(std::min(0.15, speed_factor), q_mid);
+      robot.control(mid_generator);
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
     MotionGenerator final_home_generator(speed_factor, kQHomeRad);
     robot.control(final_home_generator);
 
