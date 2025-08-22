@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
     }
 
     // Grasp the object
-    constexpr double kObjectWidthMeters = 0.0508;  // 2 inches
+    constexpr double kObjectWidthMeters = 0.0408;  // 2 inches
     gs = gripper.readOnce();
     double commanded_width = kObjectWidthMeters;
     if (gs.max_width <= 0.0) {
