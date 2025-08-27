@@ -9,6 +9,8 @@
 #include <franka/robot.h>
 
 #include "examples_common.h"
+// UDP state publisher for live plotting (auto-detects endpoint; see monitoring_tee.h)
+#include "monitoring_tee.h"
 
 namespace {
 
@@ -33,21 +35,31 @@ std::array<double, 7> toRadians(const double q_deg[7]) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  // Usage: ./grasp_two_inch_after_move <robot_ip> [speed_factor]
-  if (argc < 2 || argc > 3) {
-    std::cerr << "Usage: ./grasp_two_inch_after_move <robot_ip> [speed_factor]" << std::endl;
+  // Usage: ./grasp_two_inch_after_move <robot_ip> [speed_factor] [--src=real|sim]
+  if (argc < 2 || argc > 4) {
+    std::cerr << "Usage: ./grasp_two_inch_after_move <robot_ip> [speed_factor] [--src=real|sim]" << std::endl;
     return -1;
   }
 
   try {
     const char* host = argc > 1 ? argv[1] : "127.0.0.1";  // FCI sim server
     double speed_factor = 0.2;        // safe default
-    if (argc == 2) {
-      speed_factor = std::stod(argv[1]);
-      if (speed_factor < 0.0 || speed_factor > 1.0) {
-        std::cerr << "[speed_factor] must be in [0.0, 1.0]." << std::endl;
-        return -1;
+    std::string src_label = (std::string(host) == std::string("127.0.0.1")) ? std::string("sim") : std::string("real");
+    if (argc >= 3) {
+      std::string a2 = argv[2];
+      if (a2.rfind("--src=", 0) == 0) {
+        src_label = a2.substr(6);
+      } else {
+        speed_factor = std::stod(a2);
       }
+    }
+    if (argc == 4) {
+      std::string a3 = argv[3];
+      if (a3.rfind("--src=", 0) == 0) src_label = a3.substr(6);
+    }
+    if (speed_factor < 0.0 || speed_factor > 1.0) {
+      std::cerr << "[speed_factor] must be in [0.0, 1.0]." << std::endl;
+      return -1;
     }
 
     // Connect to robot and gripper.
@@ -56,6 +68,8 @@ int main(int argc, char** argv) {
 
     // Apply standard behavior.
     setDefaultBehavior(robot);
+    // Monitoring publisher (uses ~/.config/franka/mon_endpoint by default)
+    franka_monitor::StatePublisher monitor(src_label);
 
     // Homing + open fully (near max width)
     std::cout << "Homing gripper..." << std::endl;
@@ -73,7 +87,7 @@ int main(int argc, char** argv) {
     if (max_abs_diff(start_state.q_d, kQHomeRad) > 1e-3) {
       std::cout << "Moving to home pose..." << std::endl;
       MotionGenerator home_generator(speed_factor, kQHomeRad);
-      robot.control(home_generator);
+      robot.control(monitor.tee(home_generator));
     } else {
       std::cout << "Already at home pose; skipping home move." << std::endl;
     }
@@ -82,7 +96,7 @@ int main(int argc, char** argv) {
     const std::array<double, 7> q_goal = toRadians(kQDeg);
     std::cout << "Moving to target joint configuration..." << std::endl;
     MotionGenerator motion_generator(speed_factor, q_goal);
-    robot.control(motion_generator);
+    robot.control(monitor.tee(motion_generator));
 
     // Verify convergence and optionally perform settling passes.
     auto measure_and_print = [&](const char* tag) {
@@ -113,7 +127,7 @@ int main(int argc, char** argv) {
       std::cout << "Settling pass (attempt " << (settle_attempts + 1)
                 << ") to reduce residual error..." << std::endl;
       MotionGenerator settle_gen(std::min(0.15, speed_factor), q_goal);
-      robot.control(settle_gen);
+      robot.control(monitor.tee(settle_gen));
       std::this_thread::sleep_for(std::chrono::milliseconds(200));
       err = measure_and_print("Post-settle joint positions");
       settle_attempts++;

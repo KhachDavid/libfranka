@@ -7,6 +7,8 @@
 #include <franka/robot.h>
 
 #include "examples_common.h"
+// UDP state publisher for live plotting (auto-detects endpoint; see monitoring_tee.h)
+#include "monitoring_tee.h"
 
 /**
  * @example generate_elbow_motion.cpp
@@ -16,13 +18,22 @@
  */
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    std::cerr << "Usage: " << argv[0] << " <robot-hostname>" << std::endl;
+  if (argc < 2 || argc > 3) {
+    std::cerr << "Usage: " << argv[0] << " <robot-hostname> [--src=real|sim]" << std::endl;
     return -1;
   }
   try {
-    franka::Robot robot(argv[1]);
+    const std::string host = argv[1];
+    franka::Robot robot(host);
     setDefaultBehavior(robot);
+
+    // Monitoring publisher (uses ~/.config/franka/mon_endpoint by default)
+    std::string src_label = (host == std::string("127.0.0.1")) ? std::string("sim") : std::string("real");
+    if (argc == 3) {
+      std::string a2 = argv[2];
+      if (a2.rfind("--src=", 0) == 0) src_label = a2.substr(6);
+    }
+    franka_monitor::StatePublisher monitor(src_label);
 
     // First move the robot to a suitable joint configuration
     std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
@@ -31,7 +42,7 @@ int main(int argc, char** argv) {
               << "Please make sure to have the user stop button at hand!" << std::endl
               << "Press Enter to continue..." << std::endl;
     std::cin.ignore();
-    robot.control(motion_generator);
+    robot.control(monitor.tee(motion_generator));
     std::cout << "Finished moving to initial joint configuration." << std::endl;
 
     // Set additional parameters always before the control loop, NEVER in the control loop!
@@ -45,7 +56,7 @@ int main(int argc, char** argv) {
     std::array<double, 16> initial_pose;
     std::array<double, 2> initial_elbow;
     double time = 0.0;
-    robot.control(
+    robot.control(monitor.tee(
         [&time, &initial_pose, &initial_elbow](const franka::RobotState& robot_state,
                                                franka::Duration period) -> franka::CartesianPose {
           time += period.toSec();
@@ -66,7 +77,7 @@ int main(int argc, char** argv) {
           }
 
           return {initial_pose, elbow};
-        });
+        }));
   } catch (const franka::Exception& e) {
     std::cout << e.what() << std::endl;
     return -1;

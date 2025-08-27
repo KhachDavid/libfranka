@@ -46,7 +46,13 @@ def main():
         tr.start(); ts.start()
 
     plt.ion()
+
+
     fig, axes = plt.subplots(7, 1, figsize=(8, 10), sharex=True)
+    fig.suptitle(
+        f"Real vs Sim Joint Positions ",
+        fontsize=12
+    )
     # Historical buffers
     times_real: List[float] = []       # RobotState::time
     times_sim: List[float] = []
@@ -63,7 +69,7 @@ def main():
         axes[j].legend(loc="upper right")
         axes[j].set_ylabel(f"q{j} [rad]")
         lines.append((l1, l2))
-    axes[-1].set_xlabel("t [s]")
+    axes[-1].set_xlabel("t [s] (libfranka timestep, aligned among real and sim)")
 
     latest = {"real": None, "sim": None}
     base_t = {"real": None, "sim": None}

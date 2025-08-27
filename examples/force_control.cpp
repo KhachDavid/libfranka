@@ -11,6 +11,8 @@
 #include <franka/robot.h>
 
 #include "examples_common.h"
+// UDP state publisher for live plotting (auto-detects endpoint; see monitoring_tee.h)
+#include "monitoring_tee.h"
 
 /**
  * @example force_control.cpp
@@ -23,8 +25,8 @@
 
 int main(int argc, char** argv) {
   // Check whether the required arguments were passed
-  if (argc != 2) {
-    std::cerr << "Usage: " << argv[0] << " <robot-hostname>" << std::endl;
+  if (argc < 2 || argc > 3) {
+    std::cerr << "Usage: " << argv[0] << " <robot-hostname> [--src=real|sim]" << std::endl;
     return -1;
   }
   // parameters
@@ -36,8 +38,16 @@ int main(int argc, char** argv) {
 
   try {
     // connect to robot
-    franka::Robot robot(argv[1]);
+    const std::string host = argv[1];
+    franka::Robot robot(host);
     setDefaultBehavior(robot);
+    // Monitoring publisher (uses ~/.config/franka/mon_endpoint by default)
+    std::string src_label = (host == std::string("127.0.0.1")) ? std::string("sim") : std::string("real");
+    if (argc == 3) {
+      std::string a2 = argv[2];
+      if (a2.rfind("--src=", 0) == 0) src_label = a2.substr(6);
+    }
+    franka_monitor::StatePublisher monitor(src_label);
     // load the kinematics and dynamics model
     franka::Model model = robot.loadModel();
 
@@ -110,7 +120,7 @@ int main(int argc, char** argv) {
               << "Press Enter to continue..." << std::endl;
     std::cin.ignore();
     // start real-time control loop
-    robot.control(force_control_callback);
+    robot.control(monitor.tee(force_control_callback));
 
   } catch (const std::exception& ex) {
     // print exception

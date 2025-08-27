@@ -6,6 +6,9 @@
 #include <franka/exception.h>
 #include <franka/model.h>
 
+// UDP state publisher for live plotting (auto-detects endpoint; see monitoring_tee.h)
+#include "monitoring_tee.h"
+
 /**
  * @example print_joint_poses.cpp
  * An example showing how to use the model library that prints the transformation
@@ -22,14 +25,22 @@ std::ostream& operator<<(std::ostream& ostream, const std::array<T, N>& array) {
 }
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    std::cerr << "Usage: " << argv[0] << " <robot-hostname>" << std::endl;
+  if (argc < 2 || argc > 3) {
+    std::cerr << "Usage: " << argv[0] << " <robot-hostname> [--src=real|sim]" << std::endl;
     return -1;
   }
 
   try {
-    franka::Robot robot(argv[1]);
+    const std::string host = argv[1];
+    franka::Robot robot(host);
+    std::string src_label = (host == std::string("127.0.0.1")) ? std::string("sim") : std::string("real");
+    if (argc == 3) {
+      std::string a2 = argv[2];
+      if (a2.rfind("--src=", 0) == 0) src_label = a2.substr(6);
+    }
+    franka_monitor::StatePublisher monitor(src_label);
     franka::RobotState state = robot.readOnce();
+    if (monitor.enabled()) monitor.publish(state);
     franka::Model model(robot.loadModel());
     for (franka::Frame frame = franka::Frame::kJoint1; frame <= franka::Frame::kEndEffector;
          frame++) {

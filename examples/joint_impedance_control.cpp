@@ -16,6 +16,8 @@
 #include <franka/robot.h>
 
 #include "examples_common.h"
+// UDP state publisher for live plotting (auto-detects endpoint; see monitoring_tee.h)
+#include "monitoring_tee.h"
 
 namespace {
 template <class T, size_t N>
@@ -39,9 +41,9 @@ std::ostream& operator<<(std::ostream& ostream, const std::array<T, N>& array) {
  */
 
 int main(int argc, char** argv) {
-  // Check whether the required arguments were passed.
-  if (argc != 2) {
-    std::cerr << "Usage: " << argv[0] << " <robot-hostname>" << std::endl;
+  // Usage: ./joint_impedance_control <robot-hostname> [--src=real|sim]
+  if (argc < 2 || argc > 3) {
+    std::cerr << "Usage: " << argv[0] << " <robot-hostname> [--src=real|sim]" << std::endl;
     return -1;
   }
   // Set and initialize trajectory parameters.
@@ -101,8 +103,17 @@ int main(int argc, char** argv) {
 
   try {
     // Connect to robot.
-    franka::Robot robot(argv[1]);
+    const std::string host = argv[1];
+    franka::Robot robot(host);
     setDefaultBehavior(robot);
+
+    // Monitoring publisher (uses ~/.config/franka/mon_endpoint by default)
+    std::string src_label = (host == std::string("127.0.0.1")) ? std::string("sim") : std::string("real");
+    if (argc == 3) {
+      std::string a2 = argv[2];
+      if (a2.rfind("--src=", 0) == 0) src_label = a2.substr(6);
+    }
+    franka_monitor::StatePublisher monitor(src_label);
 
     // First move the robot to a suitable joint configuration
     std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
@@ -214,7 +225,7 @@ int main(int argc, char** argv) {
     };
 
     // Start real-time control loop.
-    robot.control(impedance_control_callback, cartesian_pose_callback);
+    robot.control(monitor.tee(impedance_control_callback), cartesian_pose_callback);
 
   } catch (const franka::Exception& ex) {
     running = false;
