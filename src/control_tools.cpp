@@ -73,6 +73,12 @@ bool setCurrentThreadToHighestSchedulerPriority(std::string* error_message) {
 
   sched_param thread_param{};
   thread_param.sched_priority = thread_priority;
+  if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &thread_param) != 0) {
+    if (error_message != nullptr) {
+      *error_message = "libfranka: unable to set realtime scheduling: "s + std::strerror(errno);
+    }
+    return false;
+  }
   return true;
 #endif
 }
