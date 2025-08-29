@@ -17,7 +17,7 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr double kDegToRad = kPi / 180.0;
 
 // Target joint configuration in degrees (same as original example).
-constexpr double kQDeg[7] = {-11.0, 15.0, -9.0, -146.0, 4.0, 157.0, 25.0};
+constexpr double kQDeg[7] = {-11.0, 15.0, -9.0, -146.0, -10.0, 157.0, 25.0};
 
 // Home configuration in radians (Panda default example home).
 constexpr std::array<double, 7> kQHomeRad = {
